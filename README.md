@@ -65,7 +65,7 @@ export PYRUNNER_PASS=your_password
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PYRUNNER_PORT` | `8000` | 服务端口 |
+| `PYRUNNER_PORT` | `8000` | 服务端口（也可用 `PYRUNNER_LISTEN_PORT`） |
 | `PYRUNNER_USER` | 空 | 管理员用户名，空=不开启认证 |
 | `PYRUNNER_PASS` | 空 | 管理员密码，空=不开启认证 |
 | `PYRUNNER_DATA` | `.` | 数据目录（存放 DB 和脚本） |

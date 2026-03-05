@@ -42,8 +42,14 @@ type config struct {
 var cfg config
 
 func loadConfig() config {
+	port := envOr("PYRUNNER_LISTEN_PORT", envOr("PYRUNNER_PORT", "8000"))
+	// Kubernetes/Docker may inject PYRUNNER_PORT=tcp://x.x.x.x:8000 when
+	// the service is named "pyrunner". Detect and ignore that.
+	if strings.Contains(port, "://") {
+		port = "8000"
+	}
 	c := config{
-		Port: envOr("PYRUNNER_PORT", "8000"),
+		Port: port,
 		User: envOr("PYRUNNER_USER", ""),
 		Pass: envOr("PYRUNNER_PASS", ""),
 		Data: envOr("PYRUNNER_DATA", "."),

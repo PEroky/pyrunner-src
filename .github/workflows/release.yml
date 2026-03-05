@@ -1,0 +1,114 @@
+name: Build Release Binaries
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Platforms to build (comma-separated)"
+        required: false
+        default: "linux/amd64,linux/arm64,linux/arm/7,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+            suffix: linux-armv7
+          - goos: linux
+            goarch: "386"
+            suffix: linux-386
+          - goos: linux
+            goarch: mips64le
+            suffix: linux-mips64le
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            suffix: windows-arm64
+            ext: .exe
+          - goos: freebsd
+            goarch: amd64
+            suffix: freebsd-amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          VERSION=${GITHUB_REF_NAME:-dev}
+          OUTPUT="pyrunner-${VERSION}-${{ matrix.suffix }}${{ matrix.ext }}"
+          go build -ldflags="-s -w -X main.version=${VERSION}" -o "${OUTPUT}" .
+          # Generate checksum
+          sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"
+          echo "OUTPUT=${OUTPUT}" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyrunner-${{ matrix.suffix }}
+          path: |
+            pyrunner-*-${{ matrix.suffix }}${{ matrix.ext }}
+            pyrunner-*-${{ matrix.suffix }}${{ matrix.ext }}.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          cat *.sha256 > ../checksums.txt
+          echo "--- All checksums ---"
+          cat ../checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/pyrunner-*
+            checksums.txt

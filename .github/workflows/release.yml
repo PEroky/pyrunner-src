@@ -2,11 +2,38 @@ name: Build Release Binaries
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths:
+      - "*.go"
+      - "go.*"
+      - "index.html"
+      - "Dockerfile"
   workflow_dispatch:
 
 jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create date tag
+        id: tag
+        run: |
+          VERSION="v$(date -u +'%Y%m%d.%H%M')"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          git tag "${VERSION}"
+          git push origin "${VERSION}"
+          echo "Tagged: ${VERSION}"
+
   build:
+    needs: tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -36,7 +63,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          VERSION=${GITHUB_REF_NAME:-dev}
+          VERSION=${{ needs.tag.outputs.version }}
           OUTPUT="pyrunner-${VERSION}-${{ matrix.suffix }}"
           go build -ldflags="-s -w -X main.version=${VERSION}" -o "${OUTPUT}" .
           sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"
@@ -51,9 +78,8 @@ jobs:
             pyrunner-*-${{ matrix.suffix }}.sha256
 
   release:
-    needs: build
+    needs: [tag, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
 
@@ -72,6 +98,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.tag.outputs.version }}
           generate_release_notes: true
           files: |
             dist/pyrunner-*

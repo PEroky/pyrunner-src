@@ -1,0 +1,14 @@
+[Unit]
+Description=PyRunner - Python Script Manager
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/exedev/pyrunner
+ExecStart=/home/exedev/pyrunner/pyrunner
+Restart=always
+RestartSec=2
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

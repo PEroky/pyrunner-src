@@ -1,24 +1,26 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
-WORKDIR /build
-COPY go.mod go.sum ./
-RUN go mod download
-COPY main.go index.html ./
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o pyrunner .
-
-# Runtime stage
 FROM python:3.12-slim
+
+ARG TARGETARCH
+ARG VERSION=v20260306.0257
+ARG REPO=PEroky/pyrunner-src
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tini && \
+    tini curl && \
     rm -rf /var/lib/apt/lists/*
+
+RUN ARCH=$(case "${TARGETARCH}" in amd64) echo "linux-amd64";; arm64) echo "linux-arm64";; *) echo "linux-${TARGETARCH}";; esac) && \
+    curl -fSL "https://github.com/${REPO}/releases/download/${VERSION}/pyrunner-${VERSION}-${ARCH}" -o /usr/local/bin/pyrunner && \
+    chmod +x /usr/local/bin/pyrunner
+
 WORKDIR /app
-COPY --from=builder /build/pyrunner /app/pyrunner
 RUN mkdir -p /data/scripts
+
 ENV PYRUNNER_PORT=8000 \
     PYRUNNER_USER= \
     PYRUNNER_PASS= \
     PYRUNNER_DATA=/data
+
 EXPOSE 8000
 VOLUME /data
 ENTRYPOINT ["tini", "--"]
-CMD ["/app/pyrunner"]
+CMD ["pyrunner"]

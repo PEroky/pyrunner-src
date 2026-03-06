@@ -1,7 +1,14 @@
 name: Build & Push Docker Image
 
 on:
+  workflow_run:
+    workflows: ["Build Release Binaries"]
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version tag (e.g. v20260306.0257)"
+        required: true
 
 env:
   REGISTRY: ghcr.io
@@ -10,6 +17,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -17,6 +25,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "latest")
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -31,23 +51,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.tag }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

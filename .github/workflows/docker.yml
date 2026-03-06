@@ -12,7 +12,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -28,9 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine version
-        id: version
+      - name: Determine version & image name
+        id: meta
         run: |
+          IMAGE="${GITHUB_REPOSITORY,,}"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
@@ -58,7 +59,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            VERSION=${{ steps.version.outputs.tag }}
+            VERSION=${{ steps.meta.outputs.tag }}
+            REPO=${{ steps.meta.outputs.image }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:latest

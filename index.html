@@ -3,140 +3,145 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PyRunner - Python 脚本管理面板</title>
+<title>PyRunner</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0f1117;--surface:#1a1b26;--surface2:#24253a;--border:#2f3146;--text:#c0caf5;--text2:#565f89;--accent:#7aa2f7;--green:#9ece6a;--red:#f7768e;--yellow:#e0af68;--orange:#ff9e64;--font:'SF Mono',SFMono-Regular,ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace}
+
+/* Dark theme (default) */
+:root,html[data-theme="dark"]{
+  --bg:#0f1117;--surface:#1a1b26;--surface2:#24253a;--border:#2f3146;
+  --text:#c0caf5;--text2:#565f89;--accent:#7aa2f7;--green:#9ece6a;
+  --red:#f7768e;--yellow:#e0af68;--terminal-bg:#000;--terminal-fg:#d4d4d4;
+  --font:'SF Mono',SFMono-Regular,ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace;
+  --modal-overlay:rgba(0,0,0,.6);--badge-run-bg:rgba(122,162,247,.15);
+  --badge-ok-bg:rgba(158,206,106,.15);--badge-err-bg:rgba(247,118,142,.15);
+  --badge-stop-bg:rgba(224,175,104,.15)
+}
+
+/* Light theme */
+html[data-theme="light"]{
+  --bg:#f5f5f5;--surface:#fff;--surface2:#e8e8e8;--border:#d0d0d0;
+  --text:#24292e;--text2:#6a737d;--accent:#0366d6;--green:#22863a;
+  --red:#cb2431;--yellow:#b08800;--terminal-bg:#1e1e1e;--terminal-fg:#d4d4d4;
+  --modal-overlay:rgba(0,0,0,.3);--badge-run-bg:rgba(3,102,214,.1);
+  --badge-ok-bg:rgba(34,134,58,.1);--badge-err-bg:rgba(203,36,49,.1);
+  --badge-stop-bg:rgba(176,136,0,.1)
+}
+
 html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
 
-/* Layout */
 .app{display:flex;height:100vh}
-.sidebar{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar{width:260px;min-width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
-/* Sidebar */
-.sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.sidebar-header h1{font-size:16px;font-weight:600;color:var(--accent)}
-.sidebar-header h1 span{color:var(--text2);font-weight:400}
-.btn{padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:13px;transition:all .15s}
+.sidebar-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sidebar-header h1{font-size:15px;font-weight:600;color:var(--accent)}
+.btn{padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px;transition:all .15s}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn-primary{background:var(--accent);color:#1a1b26;border-color:var(--accent);font-weight:500}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+html[data-theme="dark"] .btn-primary{color:#1a1b26}
 .btn-primary:hover{opacity:.85}
 .btn-danger{border-color:var(--red);color:var(--red)}
-.btn-danger:hover{background:var(--red);color:#1a1b26}
-.btn-sm{padding:4px 8px;font-size:12px}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:3px 8px;font-size:11px}
 
-.script-list{flex:1;overflow-y:auto;padding:8px}
-.script-item{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:all .15s;display:flex;align-items:center;gap:8px}
+.script-list{flex:1;overflow-y:auto;padding:6px}
+.script-item{padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:all .12s;display:flex;align-items:center;gap:8px}
 .script-item:hover{background:var(--surface2)}
 .script-item.active{background:var(--surface2);border-left:2px solid var(--accent)}
 .script-item .name{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.script-item .desc{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.script-item .desc{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .status-dot.running{background:var(--accent);animation:pulse 1.5s infinite}
 .status-dot.success{background:var(--green)}
-.status-dot.failed{background:var(--red)}
+.status-dot.failed,.status-dot.error{background:var(--red)}
 .status-dot.stopped{background:var(--yellow)}
 .status-dot.none{background:var(--text2);opacity:.3}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* Main area */
-.main-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:var(--surface);min-height:52px}
-.main-header .title{font-size:15px;font-weight:500;flex:1}
-.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
-
-/* Tabs */
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px}
-.tab{padding:10px 16px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.main-header{padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface);min-height:44px}
+.main-header .title{font-size:14px;font-weight:500;flex:1}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 16px}
+.tab{padding:8px 14px;font-size:12px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-.tab-content{flex:1;overflow:auto;padding:20px}
+.tab-content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:10px 16px}
 
-/* Editor */
-.editor-wrap{display:flex;flex-direction:column;height:100%}
-.editor-wrap textarea{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--font);font-size:13px;line-height:1.6;resize:none;outline:none}
+/* Editor - fill all available space */
+.editor-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
+.editor-wrap textarea{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--font);font-size:13px;line-height:1.6;resize:none;outline:none;min-height:0}
 .editor-wrap textarea:focus{border-color:var(--accent)}
-.form-row{display:flex;gap:12px;margin-bottom:12px}
-.form-group{display:flex;flex-direction:column;gap:4px}
+.editor-bar{padding:8px 0 0;display:flex;justify-content:flex-end;flex-shrink:0}
+
+/* Terminal - fill all available space */
+.output-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
+.output-bar{margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.terminal{background:var(--terminal-bg);color:var(--terminal-fg);font-family:var(--font);font-size:13px;line-height:1.5;padding:10px;border-radius:6px;flex:1;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:0}
+
+.run-list{display:flex;flex-direction:column;gap:4px}
+.run-item{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--surface);border-radius:6px;cursor:pointer;transition:all .12s}
+.run-item:hover{background:var(--surface2)}
+.run-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.run-badge.running{background:var(--badge-run-bg);color:var(--accent)}
+.run-badge.success{background:var(--badge-ok-bg);color:var(--green)}
+.run-badge.failed,.run-badge.error{background:var(--badge-err-bg);color:var(--red)}
+.run-badge.stopped{background:var(--badge-stop-bg);color:var(--yellow)}
+.run-time{font-size:11px;color:var(--text2)}
+.run-id{font-size:11px;color:var(--text2);font-family:var(--font)}
+
+.modal-overlay{position:fixed;inset:0;background:var(--modal-overlay);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:400px;max-width:90vw}
+.modal h2{font-size:15px;margin-bottom:14px}
+.form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .form-group label{font-size:12px;color:var(--text2)}
 .form-group input{padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
 .form-group input:focus{border-color:var(--accent)}
+.modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 
-/* Terminal */
-.terminal{background:#000;color:#d4d4d4;font-family:var(--font);font-size:13px;line-height:1.5;padding:12px;border-radius:6px;flex:1;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:200px}
-
-/* Run history */
-.run-list{display:flex;flex-direction:column;gap:4px}
-.run-item{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--surface);border-radius:6px;cursor:pointer;transition:all .15s}
-.run-item:hover{background:var(--surface2)}
-.run-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
-.run-badge.running{background:rgba(122,162,247,.15);color:var(--accent)}
-.run-badge.success{background:rgba(158,206,106,.15);color:var(--green)}
-.run-badge.failed{background:rgba(247,118,142,.15);color:var(--red)}
-.run-badge.stopped{background:rgba(224,175,104,.15);color:var(--yellow)}
-.run-time{font-size:12px;color:var(--text2)}
-.run-id{font-size:12px;color:var(--text2);font-family:var(--font)}
-
-/* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:420px;max-width:90vw}
-.modal h2{font-size:16px;margin-bottom:16px}
-.modal .form-group{margin-bottom:12px}
-.modal .form-group input,.modal .form-group textarea{width:100%}
-.modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
-
-/* Empty state */
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);gap:12px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);gap:10px}
 .empty svg{opacity:.3}
-.empty p{font-size:14px}
+.empty p{font-size:13px}
 
-/* Sidebar footer */
-.sidebar-footer{padding:12px;border-top:1px solid var(--border)}
+.sidebar-footer{padding:8px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
 
-/* Pip manager */
-.pip-bar{display:flex;gap:8px;margin-bottom:16px}
-.pip-bar input{flex:1;padding:8px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
+/* Pip */
+.pip-bar{display:flex;gap:8px;margin-bottom:12px;flex-shrink:0}
+.pip-bar input{flex:1;padding:7px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
 .pip-bar input:focus{border-color:var(--accent)}
 .pkg-table{width:100%;border-collapse:collapse;font-size:13px}
-.pkg-table th{text-align:left;padding:8px 12px;color:var(--text2);border-bottom:1px solid var(--border);font-weight:500;position:sticky;top:0;background:var(--bg)}
-.pkg-table td{padding:6px 12px;border-bottom:1px solid var(--border)}
+.pkg-table th{text-align:left;padding:6px 10px;color:var(--text2);border-bottom:1px solid var(--border);font-weight:500;position:sticky;top:0;background:var(--bg)}
+.pkg-table td{padding:5px 10px;border-bottom:1px solid var(--border)}
 .pkg-table tr:hover td{background:var(--surface)}
-.pkg-count{font-size:12px;color:var(--text2);margin-bottom:8px}
-.pip-output{margin-top:16px}
+.pkg-count{font-size:11px;color:var(--text2)}
 
 /* Login */
 .login-wrap{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
-.login-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:360px;max-width:90vw}
-.login-box h1{font-size:20px;text-align:center;margin-bottom:24px;color:var(--accent)}
-.login-box .form-group{margin-bottom:16px}
-.login-box .form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px}
-.login-box .form-group input{width:100%;padding:10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none}
-.login-box .form-group input:focus{border-color:var(--accent)}
-.login-box .login-btn{width:100%;padding:10px;background:var(--accent);color:#1a1b26;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:340px;max-width:90vw}
+.login-box h1{font-size:18px;text-align:center;margin-bottom:20px;color:var(--accent)}
+.login-box .form-group{margin-bottom:14px}
+.login-box .form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
+.login-box .form-group input{width:100%;padding:9px 12px;font-size:13px}
+.login-box .login-btn{width:100%;padding:9px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+html[data-theme="dark"] .login-box .login-btn{color:#1a1b26}
 .login-box .login-btn:hover{opacity:.85}
-.login-box .login-error{color:var(--red);font-size:13px;text-align:center;margin-top:12px;display:none}
+.login-error{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
 
-/* Scrollbar */
-::-webkit-scrollbar{width:6px;height:6px}
+/* Theme toggle */
+.theme-toggle{background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1}
+
+::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text2)}
 </style>
 </head>
 <body>
-<!-- Login Page -->
 <div class="login-wrap" id="loginPage" style="display:none">
   <div class="login-box">
     <h1>🐍 PyRunner</h1>
-    <div class="form-group">
-      <label>用户名</label>
-      <input id="loginUser" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
-    </div>
-    <div class="form-group">
-      <label>密码</label>
-      <input id="loginPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
+    <div class="form-group"><label>用户名</label><input id="loginUser" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
+    <div class="form-group"><label>密码</label><input id="loginPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" onclick="doLogin()">登录</button>
     <div class="login-error" id="loginError">用户名或密码错误</div>
   </div>
@@ -146,36 +151,30 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
   <div class="sidebar">
     <div class="sidebar-header">
       <h1>🐍 PyRunner</h1>
-      <button class="btn btn-primary btn-sm" onclick="showNewModal()">+ 新建</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn">🌙</button>
+        <button class="btn btn-primary btn-sm" onclick="showNewModal()">+ 新建</button>
+      </div>
     </div>
     <div class="script-list" id="scriptList"></div>
     <div class="sidebar-footer">
       <button class="btn btn-sm" style="width:100%" onclick="showPipManager()">📦 包管理</button>
-      <button class="btn btn-sm" id="logoutBtn" style="width:100%;margin-top:6px;display:none" onclick="doLogout()">🚪 退出登录</button>
+      <button class="btn btn-sm" id="logoutBtn" style="width:100%;display:none" onclick="doLogout()">🚪 退出</button>
     </div>
   </div>
-  <div class="main">
-    <div id="mainArea">
-      <div class="empty" style="height:100vh">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-        <p>选择一个脚本开始，或点击 <b>+ 新建</b></p>
-      </div>
+  <div class="main" id="mainArea">
+    <div class="empty" style="height:100%">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      <p>选择脚本或点击 <b>+ 新建</b></p>
     </div>
   </div>
 </div>
 
-<!-- New/Edit Modal -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
   <div class="modal">
     <h2 id="modalTitle">新建脚本</h2>
-    <div class="form-group">
-      <label>名称</label>
-      <input id="modalName" placeholder="my_script (无需.py后缀)">
-    </div>
-    <div class="form-group">
-      <label>描述</label>
-      <input id="modalDesc" placeholder="可选描述">
-    </div>
+    <div class="form-group"><label>名称</label><input id="modalName" placeholder="my_script"></div>
+    <div class="form-group"><label>描述</label><input id="modalDesc" placeholder="可选"></div>
     <div class="actions">
       <button class="btn" onclick="closeModal()">取消</button>
       <button class="btn btn-primary" id="modalSubmit" onclick="submitModal()">创建</button>
@@ -184,487 +183,291 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 </div>
 
 <script>
-const API = '/api';
-let scripts = [];
-let activeScript = null;
-let activeTab = 'editor';
-let currentRuns = [];
-let streamSource = null;
-let viewingRunId = null;
+const API='/api', MAX_TERM_LINES=50;
+let scripts=[],activeScript=null,activeTab='editor',currentRuns=[],streamSource=null,viewingRunId=null,authEnabled=false;
 
-async function api(path, opts = {}) {
-  const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined
-  });
-  if (res.status === 401) { showLogin(); throw new Error('Unauthorized'); }
-  return res.json();
+// --- Theme ---
+function initTheme(){
+  const t=localStorage.getItem('pyrunner_theme')||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
+  applyTheme(t);
+}
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('pyrunner_theme',t);
+  const btn=document.getElementById('themeBtn');
+  if(btn) btn.textContent=t==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+}
+initTheme();
+
+// --- API ---
+async function api(p,o={}){
+  const r=await fetch(API+p,{headers:{'Content-Type':'application/json'},...o,body:o.body?JSON.stringify(o.body):undefined});
+  if(r.status===401){showLogin();throw new Error('Unauthorized');}
+  return r.json();
 }
 
-// Load scripts
-async function loadScripts() {
-  scripts = await api('/scripts');
-  renderScriptList();
-}
+// --- Scripts ---
+async function loadScripts(){scripts=await api('/scripts');renderScriptList();}
 
-function renderScriptList() {
-  const el = document.getElementById('scriptList');
-  if (!scripts.length) {
-    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px">暂无脚本</div>';
-    return;
-  }
-  el.innerHTML = scripts.map(s => `
-    <div class="script-item ${activeScript && activeScript.id === s.id ? 'active' : ''}" onclick="selectScript(${s.id})">
-      <div class="status-dot ${s.last_status || 'none'}"></div>
+function renderScriptList(){
+  const el=document.getElementById('scriptList');
+  if(!scripts.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2);font-size:12px">暂无脚本</div>';return;}
+  el.innerHTML=scripts.map(s=>`
+    <div class="script-item ${activeScript&&activeScript.id===s.id?'active':''}" onclick="selectScript(${s.id})">
+      <div class="status-dot ${s.last_status||'none'}"></div>
       <div style="flex:1;min-width:0">
         <div class="name">${esc(s.name)}</div>
-        ${s.description ? `<div class="desc">${esc(s.description)}</div>` : ''}
+        ${s.description?`<div class="desc">${esc(s.description)}</div>`:''}
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-async function selectScript(id) {
-  if (streamSource) { streamSource.close(); streamSource = null; }
-  activeScript = await api(`/scripts/${id}`);
-  activeTab = 'editor';
-  viewingRunId = null;
-  renderScriptList();
-  renderMain();
-  loadRuns();
+async function selectScript(id){
+  if(streamSource){streamSource.close();streamSource=null;}
+  activeScript=await api(`/scripts/${id}`);
+  activeTab='editor';viewingRunId=null;
+  renderScriptList();renderMain();loadRuns();
 }
 
-async function loadRuns() {
-  if (!activeScript) return;
-  currentRuns = await api(`/scripts/${activeScript.id}/runs`);
-  if (activeTab === 'history') renderHistory();
+async function loadRuns(){
+  if(!activeScript)return;
+  currentRuns=await api(`/scripts/${activeScript.id}/runs`);
+  if(activeTab==='history')renderTab();
 }
 
-function renderMain() {
-  if (!activeScript) return;
-  const area = document.getElementById('mainArea');
-  area.innerHTML = `
+function renderMain(){
+  if(!activeScript)return;
+  const a=document.getElementById('mainArea');
+  a.innerHTML=`
     <div class="main-header">
       <div class="title">${esc(activeScript.name)}.py</div>
-      <button class="btn btn-sm" onclick="showEditModal()">✏️ 编辑信息</button>
+      <button class="btn btn-sm" onclick="showEditModal()">✏️ 编辑</button>
       <button class="btn btn-sm btn-primary" onclick="runScript()">▶ 运行</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteScript()">🗑 删除</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteScript()">删除</button>
     </div>
     <div class="tabs">
-      <div class="tab ${activeTab==='editor'?'active':''}" onclick="switchTab('editor')">📝 代码</div>
-      <div class="tab ${activeTab==='output'?'active':''}" onclick="switchTab('output')">💻 输出</div>
-      <div class="tab ${activeTab==='history'?'active':''}" onclick="switchTab('history')">📋 历史</div>
+      <div class="tab ${activeTab==='editor'?'active':''}" onclick="swTab('editor')">代码</div>
+      <div class="tab ${activeTab==='output'?'active':''}" onclick="swTab('output')">输出</div>
+      <div class="tab ${activeTab==='history'?'active':''}" onclick="swTab('history')">历史</div>
     </div>
-    <div class="tab-content" id="tabContent"></div>
-  `;
+    <div class="tab-content" id="tabContent"></div>`;
   renderTab();
 }
 
-function switchTab(t) {
-  activeTab = t;
-  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-  event.target.classList.add('active');
-  renderTab();
-}
+function swTab(t){activeTab=t;renderMain();}
 
-function renderTab() {
-  const tc = document.getElementById('tabContent');
-  if (activeTab === 'editor') {
-    tc.innerHTML = `
-      <div class="editor-wrap">
-        <textarea id="codeEditor" spellcheck="false">${esc(activeScript.content || '')}</textarea>
-        <div style="padding-top:12px;display:flex;justify-content:flex-end">
-          <button class="btn btn-primary" onclick="saveCode()">💾 保存</button>
-        </div>
-      </div>
-    `;
-    // Handle tab key in editor
-    const ed = document.getElementById('codeEditor');
-    ed.addEventListener('keydown', e => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const s = ed.selectionStart, end = ed.selectionEnd;
-        ed.value = ed.value.substring(0, s) + '    ' + ed.value.substring(end);
-        ed.selectionStart = ed.selectionEnd = s + 4;
-      }
-    });
-  } else if (activeTab === 'output') {
-    tc.innerHTML = `
-      <div style="display:flex;flex-direction:column;height:100%">
-        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
-          <span id="outputStatus" style="font-size:13px;color:var(--text2)">无运行输出</span>
-          <span style="flex:1"></span>
-          <button class="btn btn-sm btn-danger" id="stopBtn" style="display:none" onclick="stopRun()">⏹ 停止</button>
-        </div>
-        <div class="terminal" id="terminal"></div>
-      </div>
-    `;
-    if (viewingRunId) {
-      restoreStream(viewingRunId);
-    }
-  } else if (activeTab === 'history') {
-    renderHistory();
+function renderTab(){
+  const tc=document.getElementById('tabContent');
+  if(!tc)return;
+  if(activeTab==='editor'){
+    tc.innerHTML=`<div class="editor-wrap"><textarea id="codeEditor" spellcheck="false">${esc(activeScript.content||'')}</textarea><div class="editor-bar"><button class="btn btn-primary" onclick="saveCode()">💾 保存</button></div></div>`;
+    const ed=document.getElementById('codeEditor');
+    ed.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();const s=ed.selectionStart;ed.value=ed.value.substring(0,s)+'    '+ed.value.substring(ed.selectionEnd);ed.selectionStart=ed.selectionEnd=s+4;}});
+  }else if(activeTab==='output'){
+    tc.innerHTML=`<div class="output-wrap"><div class="output-bar"><span id="outputStatus" style="font-size:12px;color:var(--text2)">无输出</span><span style="flex:1"></span><button class="btn btn-sm btn-danger" id="stopBtn" style="display:none" onclick="stopRun()">⏹ 停止</button></div><div class="terminal" id="terminal"></div></div>`;
+    if(viewingRunId)restoreStream(viewingRunId);
+  }else{
+    if(!currentRuns.length){tc.innerHTML='<div style="color:var(--text2);text-align:center;padding:30px;font-size:13px">暂无记录</div>';return;}
+    tc.innerHTML=`<div class="run-list">${currentRuns.map(r=>`
+      <div class="run-item" onclick="viewRun(${r.id})">
+        <span class="run-id">#${r.id}</span>
+        <span class="run-badge ${r.status}">${stxt(r.status)}</span>
+        <span class="run-time">${ftime(r.started_at)}</span>
+        ${r.finished_at?`<span class="run-time">→ ${ftime(r.finished_at)}</span>`:''}
+      </div>`).join('')}</div>`;
   }
 }
 
-function renderHistory() {
-  const tc = document.getElementById('tabContent');
-  if (!tc) return;
-  if (!currentRuns.length) {
-    tc.innerHTML = '<div style="color:var(--text2);text-align:center;padding:40px">暂无运行记录</div>';
-    return;
+function stxt(s){return{running:'运行中',success:'成功',failed:'失败',error:'失败',stopped:'已停止'}[s]||s;}
+function ftime(t){return t?(t.replace('T',' ').substring(0,19)):''}
+
+async function saveCode(){
+  const c=document.getElementById('codeEditor').value;
+  await api(`/scripts/${activeScript.id}`,{method:'PUT',body:{name:activeScript.name,description:activeScript.description,content:c}});
+  activeScript.content=c;showToast('已保存');
+}
+
+async function runScript(){
+  const res=await api(`/scripts/${activeScript.id}/run`,{method:'POST'});
+  if(res.error){alert(res.error);return;}
+  viewingRunId=res.run_id;activeTab='output';renderMain();
+  startStream(res.run_id);loadRuns();loadScripts();
+}
+
+// --- Terminal line limiter ---
+function appendTerm(term,text){
+  term.textContent+=text;
+  const lines=term.textContent.split('\n');
+  if(lines.length>MAX_TERM_LINES){
+    term.textContent=lines.slice(-MAX_TERM_LINES).join('\n');
   }
-  tc.innerHTML = `<div class="run-list">${currentRuns.map(r => `
-    <div class="run-item" onclick="viewRun(${r.id})">
-      <span class="run-id">#${r.id}</span>
-      <span class="run-badge ${r.status}">${statusText(r.status)}</span>
-      <span class="run-time">${formatTime(r.started_at)}</span>
-      ${r.finished_at ? `<span class="run-time">→ ${formatTime(r.finished_at)}</span>` : ''}
-    </div>
-  `).join('')}</div>`;
+  term.scrollTop=term.scrollHeight;
 }
 
-function statusText(s) {
-  return {running:'运行中',success:'成功',failed:'失败',stopped:'已停止'}[s] || s;
-}
+// --- SSE Stream ---
+function startStream(runId){
+  if(streamSource){streamSource.close();}
+  const term=document.getElementById('terminal');
+  const st=document.getElementById('outputStatus');
+  const sb=document.getElementById('stopBtn');
+  if(!term)return;
+  term.textContent='';
+  if(st)st.innerHTML=`<span class="run-badge running">运行中</span> #${runId}`;
+  if(sb)sb.style.display='';
 
-function formatTime(t) {
-  if (!t) return '';
-  return t.replace('T',' ').substring(0,19);
-}
-
-async function saveCode() {
-  const content = document.getElementById('codeEditor').value;
-  await api(`/scripts/${activeScript.id}`, {
-    method: 'PUT',
-    body: { name: activeScript.name, description: activeScript.description, content }
+  streamSource=new EventSource(`/api/runs/${runId}/stream`);
+  streamSource.addEventListener('output',e=>{
+    try{const txt=JSON.parse(e.data);appendTerm(term,txt);}catch(_){appendTerm(term,e.data+'\n');}
   });
-  activeScript.content = content;
-  showToast('已保存');
+  streamSource.addEventListener('done',e=>{
+    let status;
+    try{const d=JSON.parse(e.data);status=d.status;}catch(_){status=e.data;}
+    if(st)st.innerHTML=`<span class="run-badge ${status}">${stxt(status)}</span> #${runId}`;
+    if(sb)sb.style.display='none';
+    streamSource.close();streamSource=null;loadRuns();loadScripts();
+  });
+  streamSource.onerror=()=>{if(streamSource){streamSource.close();streamSource=null;}if(sb)sb.style.display='none';};
 }
 
-async function runScript() {
-  const res = await api(`/scripts/${activeScript.id}/run`, { method: 'POST' });
-  if (res.error) { alert(res.error); return; }
-  viewingRunId = res.run_id;
-  activeTab = 'output';
-  renderMain();
-  startStream(res.run_id);
-  loadRuns();
+async function restoreStream(runId){
+  const run=await api(`/runs/${runId}`);
+  const term=document.getElementById('terminal');
+  const st=document.getElementById('outputStatus');
+  const sb=document.getElementById('stopBtn');
+  if(!term)return;
+  // Show only last 50 lines of existing output
+  const lines=(run.output||'').split('\n');
+  term.textContent=lines.slice(-MAX_TERM_LINES).join('\n');
+  term.scrollTop=term.scrollHeight;
+  if(run.status==='running'){
+    if(st)st.innerHTML=`<span class="run-badge running">运行中</span> #${runId}`;
+    if(sb)sb.style.display='';
+    // Continue streaming from where we are
+    streamSource=new EventSource(`/api/runs/${runId}/stream`);
+    streamSource.addEventListener('output',e=>{
+      try{const txt=JSON.parse(e.data);appendTerm(term,txt);}catch(_){appendTerm(term,e.data+'\n');}
+    });
+    streamSource.addEventListener('done',e=>{
+      let status;try{const d=JSON.parse(e.data);status=d.status;}catch(_){status=e.data;}
+      if(st)st.innerHTML=`<span class="run-badge ${status}">${stxt(status)}</span> #${runId}`;
+      if(sb)sb.style.display='none';streamSource.close();streamSource=null;loadRuns();loadScripts();
+    });
+    streamSource.onerror=()=>{if(streamSource){streamSource.close();streamSource=null;}if(sb)sb.style.display='none';};
+  }else{
+    if(st)st.innerHTML=`<span class="run-badge ${run.status}">${stxt(run.status)}</span> #${runId}`;
+    if(sb)sb.style.display='none';
+  }
+}
+
+async function viewRun(id){viewingRunId=id;activeTab='output';renderMain();}
+async function stopRun(){if(!viewingRunId)return;await api(`/runs/${viewingRunId}/stop`,{method:'POST'});}
+
+async function deleteScript(){
+  if(!confirm(`确认删除 ${activeScript.name}？`))return;
+  await api(`/scripts/${activeScript.id}`,{method:'DELETE'});
+  activeScript=null;
+  document.getElementById('mainArea').innerHTML='<div class="empty" style="height:100%"><p>已删除</p></div>';
   loadScripts();
 }
 
-function startStream(runId) {
-  if (streamSource) { streamSource.close(); }
-  const term = document.getElementById('terminal');
-  const statusEl = document.getElementById('outputStatus');
-  const stopBtn = document.getElementById('stopBtn');
-  if (!term) return;
-  term.textContent = '';
-  if (statusEl) statusEl.innerHTML = '<span class="run-badge running">运行中</span> #' + runId;
-  if (stopBtn) stopBtn.style.display = '';
-
-  streamSource = new EventSource(`/api/runs/${runId}/stream`);
-  streamSource.addEventListener('output', e => {
-    term.textContent += e.data + '\n';
-    term.scrollTop = term.scrollHeight;
-  });
-  streamSource.addEventListener('done', e => {
-    if (statusEl) statusEl.innerHTML = `<span class="run-badge ${e.data}">${statusText(e.data)}</span> #${runId}`;
-    if (stopBtn) stopBtn.style.display = 'none';
-    streamSource.close();
-    streamSource = null;
-    loadRuns();
-    loadScripts();
-  });
-  streamSource.onerror = () => {
-    if (streamSource) { streamSource.close(); streamSource = null; }
-    if (stopBtn) stopBtn.style.display = 'none';
-  };
-}
-
-async function restoreStream(runId) {
-  const run = await api(`/runs/${runId}`);
-  const term = document.getElementById('terminal');
-  const statusEl = document.getElementById('outputStatus');
-  const stopBtn = document.getElementById('stopBtn');
-  if (!term) return;
-  term.textContent = run.output || '';
-  term.scrollTop = term.scrollHeight;
-  if (run.status === 'running') {
-    if (statusEl) statusEl.innerHTML = '<span class="run-badge running">运行中</span> #' + runId;
-    if (stopBtn) stopBtn.style.display = '';
-    startStream(runId);
-  } else {
-    if (statusEl) statusEl.innerHTML = `<span class="run-badge ${run.status}">${statusText(run.status)}</span> #${runId}`;
-    if (stopBtn) stopBtn.style.display = 'none';
+// --- Modal ---
+let editingScript=null;
+function showNewModal(){editingScript=null;document.getElementById('modalTitle').textContent='新建脚本';document.getElementById('modalName').value='';document.getElementById('modalDesc').value='';document.getElementById('modalSubmit').textContent='创建';document.getElementById('modal').style.display='';document.getElementById('modalName').focus();}
+function showEditModal(){editingScript=activeScript;document.getElementById('modalTitle').textContent='编辑信息';document.getElementById('modalName').value=activeScript.name;document.getElementById('modalDesc').value=activeScript.description||'';document.getElementById('modalSubmit').textContent='保存';document.getElementById('modal').style.display='';}
+function closeModal(){document.getElementById('modal').style.display='none';}
+async function submitModal(){
+  const name=document.getElementById('modalName').value.trim();
+  const desc=document.getElementById('modalDesc').value.trim();
+  if(!name){alert('请输入名称');return;}
+  if(editingScript){
+    await api(`/scripts/${editingScript.id}`,{method:'PUT',body:{name,description:desc,content:activeScript.content}});
+    closeModal();await selectScript(editingScript.id);loadScripts();
+  }else{
+    const res=await api('/scripts',{method:'POST',body:{name,description:desc,content:'# '+name+'\nprint("Hello from '+name+'")\n'}});
+    if(res.error){alert(res.error);return;}
+    closeModal();await loadScripts();selectScript(res.id);
   }
 }
 
-async function viewRun(runId) {
-  viewingRunId = runId;
-  activeTab = 'output';
-  renderMain();
-}
+// --- Pip ---
+let pipPackages=[],pipFilter='',pipRunId=null,pipStream=null;
 
-async function stopRun() {
-  if (!viewingRunId) return;
-  await api(`/runs/${viewingRunId}/stop`, { method: 'POST' });
-}
-
-async function deleteScript() {
-  if (!confirm(`确认删除 ${activeScript.name}？`)) return;
-  await api(`/scripts/${activeScript.id}`, { method: 'DELETE' });
-  activeScript = null;
-  document.getElementById('mainArea').innerHTML = '<div class="empty" style="height:100vh"><p>脚本已删除</p></div>';
-  loadScripts();
-}
-
-// Modal
-let editingScript = null;
-function showNewModal() {
-  editingScript = null;
-  document.getElementById('modalTitle').textContent = '新建脚本';
-  document.getElementById('modalName').value = '';
-  document.getElementById('modalDesc').value = '';
-  document.getElementById('modalName').disabled = false;
-  document.getElementById('modalSubmit').textContent = '创建';
-  document.getElementById('modal').style.display = '';
-  document.getElementById('modalName').focus();
-}
-function showEditModal() {
-  editingScript = activeScript;
-  document.getElementById('modalTitle').textContent = '编辑脚本信息';
-  document.getElementById('modalName').value = activeScript.name;
-  document.getElementById('modalDesc').value = activeScript.description || '';
-  document.getElementById('modalName').disabled = false;
-  document.getElementById('modalSubmit').textContent = '保存';
-  document.getElementById('modal').style.display = '';
-}
-function closeModal() {
-  document.getElementById('modal').style.display = 'none';
-}
-async function submitModal() {
-  const name = document.getElementById('modalName').value.trim();
-  const desc = document.getElementById('modalDesc').value.trim();
-  if (!name) { alert('请输入名称'); return; }
-  if (editingScript) {
-    await api(`/scripts/${editingScript.id}`, {
-      method: 'PUT',
-      body: { name, description: desc, content: activeScript.content }
-    });
-    closeModal();
-    await selectScript(editingScript.id);
-    loadScripts();
-  } else {
-    const res = await api('/scripts', {
-      method: 'POST',
-      body: { name, description: desc, content: '# ' + name + '\nprint("Hello from ' + name + '")\n' }
-    });
-    if (res.error) { alert(res.error); return; }
-    closeModal();
-    await loadScripts();
-    selectScript(res.id);
-  }
-}
-
-// Toast
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--green);color:#1a1b26;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;z-index:200;animation:fadeIn .2s';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2000);
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-// --- Pip Manager ---
-let pipPackages = [];
-let pipFilter = '';
-let pipRunId = null;
-let pipStream = null;
-
-async function showPipManager() {
-  activeScript = null;
-  if (streamSource) { streamSource.close(); streamSource = null; }
+async function showPipManager(){
+  activeScript=null;if(streamSource){streamSource.close();streamSource=null;}
   renderScriptList();
-  const area = document.getElementById('mainArea');
-  area.innerHTML = `
-    <div class="main-header">
-      <div class="title">📦 pip 包管理</div>
-    </div>
-    <div class="tab-content" id="pipContent" style="display:flex;flex-direction:column">
+  document.getElementById('mainArea').innerHTML=`
+    <div class="main-header"><div class="title">📦 pip 包管理</div></div>
+    <div class="tab-content" id="pipContent" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
       <div class="pip-bar">
-        <input id="pipInstallInput" placeholder="输入包名安装，如: requests beautifulsoup4" onkeydown="if(event.key==='Enter')pipInstall()">
-        <button class="btn btn-primary btn-sm" onclick="pipInstall()">⏬ 安装</button>
+        <input id="pipInstallInput" placeholder="输入包名，如: requests flask" onkeydown="if(event.key==='Enter')pipInstall()">
+        <button class="btn btn-primary btn-sm" onclick="pipInstall()">安装</button>
       </div>
-      <div class="pip-output" id="pipOutput" style="display:none">
-        <div style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
-          <span id="pipStatus" style="font-size:13px;color:var(--text2)"></span>
-          <button class="btn btn-sm btn-danger" id="pipStopBtn" style="display:none" onclick="pipStop()">⏹ 停止</button>
+      <div id="pipOutput" style="display:none;flex-shrink:0;margin-bottom:8px">
+        <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          <span id="pipStatus" style="font-size:12px;color:var(--text2)"></span>
+          <button class="btn btn-sm btn-danger" id="pipStopBtn" style="display:none" onclick="pipStop()">停止</button>
         </div>
-        <div class="terminal" id="pipTerminal" style="max-height:180px"></div>
+        <div class="terminal" id="pipTerminal" style="max-height:150px;flex:none"></div>
       </div>
-      <div style="margin:12px 0 8px;display:flex;align-items:center;gap:12px">
-        <input id="pipFilterInput" placeholder="🔍 搜索已安装的包..." style="flex:1;padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none" oninput="pipFilter=this.value.toLowerCase();renderPipTable()">
-        <button class="btn btn-sm" onclick="loadPipList()">↻ 刷新</button>
+      <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <input id="pipFilterInput" placeholder="🔍 搜索包..." style="flex:1;padding:5px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none" oninput="pipFilter=this.value.toLowerCase();renderPipTable()">
+        <button class="btn btn-sm" onclick="loadPipList()">↻</button>
         <span class="pkg-count" id="pipCount"></span>
       </div>
-      <div style="flex:1;overflow:auto" id="pipTableWrap"></div>
-    </div>
-  `;
+      <div style="flex:1;overflow:auto;min-height:0" id="pipTableWrap"></div>
+    </div>`;
   loadPipList();
 }
 
-async function loadPipList() {
-  try {
-    pipPackages = await api('/pip/list');
-  } catch(e) {
-    pipPackages = [];
-  }
-  renderPipTable();
+async function loadPipList(){try{pipPackages=await api('/pip/list');}catch(e){pipPackages=[];}renderPipTable();}
+
+function renderPipTable(){
+  const w=document.getElementById('pipTableWrap'),c=document.getElementById('pipCount');
+  if(!w)return;
+  const f=pipPackages.filter(p=>!pipFilter||p.name.toLowerCase().includes(pipFilter)||(p.version||'').includes(pipFilter));
+  if(c)c.textContent=`${f.length}/${pipPackages.length}`;
+  if(!f.length){w.innerHTML=`<div style="color:var(--text2);text-align:center;padding:16px;font-size:12px">${pipFilter?'无匹配':'无包'}</div>`;return;}
+  w.innerHTML=`<table class="pkg-table"><thead><tr><th>包名</th><th>版本</th><th></th></tr></thead><tbody>${f.map(p=>`<tr><td style="font-family:var(--font)">${esc(p.name)}</td><td style="color:var(--text2)">${esc(p.version)}</td><td style="text-align:right"><button class="btn btn-sm btn-danger" onclick="pipUninstall('${esc(p.name)}')" style="padding:1px 6px;font-size:10px">卸载</button></td></tr>`).join('')}</tbody></table>`;
 }
 
-function renderPipTable() {
-  const wrap = document.getElementById('pipTableWrap');
-  const countEl = document.getElementById('pipCount');
-  if (!wrap) return;
-  const filtered = pipPackages.filter(p => !pipFilter || p.name.toLowerCase().includes(pipFilter) || (p.version||'').includes(pipFilter));
-  if (countEl) countEl.textContent = `${filtered.length} / ${pipPackages.length} 个包`;
-  if (!filtered.length) {
-    wrap.innerHTML = '<div style="color:var(--text2);text-align:center;padding:20px">' + (pipFilter ? '无匹配结果' : '暂无已安装的包') + '</div>';
-    return;
-  }
-  wrap.innerHTML = `<table class="pkg-table">
-    <thead><tr><th>包名</th><th>版本</th><th></th></tr></thead>
-    <tbody>${filtered.map(p => `<tr>
-      <td style="font-family:var(--font)">${esc(p.name)}</td>
-      <td style="color:var(--text2)">${esc(p.version)}</td>
-      <td style="text-align:right"><button class="btn btn-sm btn-danger" onclick="pipUninstall('${esc(p.name)}')" style="padding:2px 6px;font-size:11px">卸载</button></td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
+async function pipInstall(){const i=document.getElementById('pipInstallInput'),p=i.value.trim();if(!p)return;const r=await api('/pip/install',{method:'POST',body:{packages:p}});if(r.error){alert(r.error);return;}i.value='';pipRunId=r.run_id;pipStartStream(r.run_id,'安装中');}
+async function pipUninstall(n){if(!confirm(`卸载 ${n}？`))return;const r=await api('/pip/uninstall',{method:'POST',body:{packages:n}});if(r.error){alert(r.error);return;}pipRunId=r.run_id;pipStartStream(r.run_id,'卸载中');}
 
-async function pipInstall() {
-  const input = document.getElementById('pipInstallInput');
-  const pkgs = input.value.trim();
-  if (!pkgs) return;
-  const res = await api('/pip/install', { method: 'POST', body: { packages: pkgs } });
-  if (res.error) { alert(res.error); return; }
-  input.value = '';
-  pipRunId = res.run_id;
-  pipStartStream(res.run_id, '安装中');
-}
-
-async function pipUninstall(name) {
-  if (!confirm(`确认卸载 ${name}？`)) return;
-  const res = await api('/pip/uninstall', { method: 'POST', body: { packages: name } });
-  if (res.error) { alert(res.error); return; }
-  pipRunId = res.run_id;
-  pipStartStream(res.run_id, '卸载中');
-}
-
-function pipStartStream(runId, label) {
-  if (pipStream) { pipStream.close(); }
-  const outDiv = document.getElementById('pipOutput');
-  const term = document.getElementById('pipTerminal');
-  const statusEl = document.getElementById('pipStatus');
-  const stopBtn = document.getElementById('pipStopBtn');
-  if (!outDiv || !term) return;
-  outDiv.style.display = '';
-  term.textContent = '';
-  if (statusEl) statusEl.innerHTML = `<span class="run-badge running">${label}</span> #${runId}`;
-  if (stopBtn) stopBtn.style.display = '';
-
-  pipStream = new EventSource(`/api/runs/${runId}/stream`);
-  pipStream.addEventListener('output', e => {
-    term.textContent += e.data + '\n';
-    term.scrollTop = term.scrollHeight;
+function pipStartStream(runId,label){
+  if(pipStream){pipStream.close();}
+  const o=document.getElementById('pipOutput'),t=document.getElementById('pipTerminal'),s=document.getElementById('pipStatus'),b=document.getElementById('pipStopBtn');
+  if(!o||!t)return;o.style.display='';t.textContent='';
+  if(s)s.innerHTML=`<span class="run-badge running">${label}</span> #${runId}`;
+  if(b)b.style.display='';
+  pipStream=new EventSource(`/api/runs/${runId}/stream`);
+  pipStream.addEventListener('output',e=>{try{appendTerm(t,JSON.parse(e.data));}catch(_){appendTerm(t,e.data+'\n');}});
+  pipStream.addEventListener('done',e=>{
+    let status;try{const d=JSON.parse(e.data);status=d.status;}catch(_){status=e.data;}
+    if(s)s.innerHTML=`<span class="run-badge ${status}">${stxt(status)}</span> #${runId}`;
+    if(b)b.style.display='none';pipStream.close();pipStream=null;setTimeout(loadPipList,500);
   });
-  pipStream.addEventListener('done', e => {
-    if (statusEl) statusEl.innerHTML = `<span class="run-badge ${e.data}">${statusText(e.data)}</span> #${runId}`;
-    if (stopBtn) stopBtn.style.display = 'none';
-    pipStream.close();
-    pipStream = null;
-    // Refresh package list after install/uninstall
-    setTimeout(loadPipList, 500);
-  });
-  pipStream.onerror = () => {
-    if (pipStream) { pipStream.close(); pipStream = null; }
-    if (stopBtn) stopBtn.style.display = 'none';
-  };
+  pipStream.onerror=()=>{if(pipStream){pipStream.close();pipStream=null;}if(b)b.style.display='none';};
 }
-
-async function pipStop() {
-  if (!pipRunId) return;
-  await api(`/runs/${pipRunId}/stop`, { method: 'POST' });
-}
+async function pipStop(){if(!pipRunId)return;await api(`/runs/${pipRunId}/stop`,{method:'POST'});}
 
 // --- Auth ---
-let authEnabled = false;
-
-async function checkAuth() {
-  try {
-    const res = await fetch('/api/auth/check');
-    const data = await res.json();
-    authEnabled = data.auth_enabled;
-    if (!data.auth_enabled || data.authenticated) {
-      showApp();
-    } else {
-      showLogin();
-    }
-  } catch(e) {
-    showApp(); // Fallback: show app if check fails
-  }
+async function checkAuth(){
+  try{const r=await fetch('/api/auth/check'),d=await r.json();authEnabled=d.auth_enabled;(!d.auth_enabled||d.authenticated)?showApp():showLogin();}catch(e){showApp();}
 }
-
-function showLogin() {
-  document.getElementById('loginPage').style.display = '';
-  document.getElementById('app').style.display = 'none';
-  setTimeout(() => document.getElementById('loginUser').focus(), 100);
+function showLogin(){document.getElementById('loginPage').style.display='';document.getElementById('app').style.display='none';setTimeout(()=>document.getElementById('loginUser').focus(),100);}
+function showApp(){document.getElementById('loginPage').style.display='none';document.getElementById('app').style.display='';document.getElementById('logoutBtn').style.display=authEnabled?'':'none';loadScripts();}
+async function doLogin(){
+  const u=document.getElementById('loginUser').value,p=document.getElementById('loginPass').value,e=document.getElementById('loginError');e.style.display='none';
+  try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});r.ok?showApp():(e.style.display='');}catch(_){e.textContent='网络错误';e.style.display='';}
 }
+async function doLogout(){await fetch('/api/logout',{method:'POST'});location.reload();}
 
-function showApp() {
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('app').style.display = '';
-  document.getElementById('logoutBtn').style.display = authEnabled ? '' : 'none';
-  loadScripts();
-}
+function showToast(m){const t=document.createElement('div');t.style.cssText='position:fixed;bottom:16px;right:16px;background:var(--green);color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;z-index:200';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1500);}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
-async function doLogin() {
-  const user = document.getElementById('loginUser').value;
-  const pass = document.getElementById('loginPass').value;
-  const errEl = document.getElementById('loginError');
-  errEl.style.display = 'none';
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username: user, password: pass})
-    });
-    if (res.ok) {
-      showApp();
-    } else {
-      errEl.style.display = '';
-    }
-  } catch(e) {
-    errEl.textContent = '网络错误';
-    errEl.style.display = '';
-  }
-}
-
-async function doLogout() {
-  await fetch('/api/logout', {method:'POST'});
-  location.reload();
-}
-
-// Init
 checkAuth();
 </script>
 </body>

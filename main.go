@@ -482,6 +482,21 @@ func handleRunScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Stop any previous running instance of this script
+	rows, _ := db.Query(`SELECT id FROM runs WHERE script_id = ? AND status = 'running'`, scriptID)
+	if rows != nil {
+		for rows.Next() {
+			var prevID int64
+			rows.Scan(&prevID)
+			prevIDStr := fmt.Sprintf("%d", prevID)
+			if v, ok := runningProcs.Load(prevIDStr); ok {
+				v.(*procEntry).cancel()
+				log.Printf("auto-stopped previous run %d for script %d", prevID, scriptID)
+			}
+		}
+		rows.Close()
+	}
+
 	result, err := db.Exec(`INSERT INTO runs (script_id, status) VALUES (?, 'running')`, scriptID)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

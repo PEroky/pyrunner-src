@@ -5,7 +5,7 @@ ARG VERSION=v20260306.0257
 ARG REPO=PEroky/pyrunner-src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tini curl unzip && \
+    tini curl unzip procps htop && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Xray

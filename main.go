@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/creack/pty"
+	"golang.org/x/net/websocket"
 	_ "modernc.org/sqlite"
 )
 
@@ -102,6 +104,15 @@ func (w *syncWriter) String() string {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal state (single session)
+// ---------------------------------------------------------------------------
+
+var (
+	termMu   sync.Mutex
+	termProc *os.Process // current terminal shell process
+)
+
+// ---------------------------------------------------------------------------
 // JSON helpers
 // ---------------------------------------------------------------------------
 
@@ -139,8 +150,8 @@ func validSession(token string) bool {
 
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Always allow these paths without auth
-		if r.URL.Path == "/" || r.URL.Path == "/api/login" || r.URL.Path == "/api/auth/check" {
+		// Always allow these paths without auth (terminal does its own check)
+		if r.URL.Path == "/" || r.URL.Path == "/api/login" || r.URL.Path == "/api/auth/check" || r.URL.Path == "/api/terminal" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -569,39 +580,18 @@ func handleRunScript(w http.ResponseWriter, r *http.Request) {
 // Run-related handlers
 // ---------------------------------------------------------------------------
 
-func handleListRuns(w http.ResponseWriter, r *http.Request) {
+func handleLatestRun(w http.ResponseWriter, r *http.Request) {
 	id := path.Base(r.PathValue("id"))
-
-	rows, err := db.Query(`SELECT id, script_id, status, exit_code, started_at, finished_at
-		FROM runs WHERE script_id = ? ORDER BY id DESC LIMIT 20`, id)
-	if err != nil {
+	var runID int64
+	err := db.QueryRow(`SELECT id FROM runs WHERE script_id = ? ORDER BY id DESC LIMIT 1`, id).Scan(&runID)
+	if err == sql.ErrNoRows {
+		jsonError(w, http.StatusNotFound, "No runs found")
+		return
+	} else if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer rows.Close()
-
-	type runRow struct {
-		ID         int64   `json:"id"`
-		ScriptID   *int64  `json:"script_id"`
-		Status     string  `json:"status"`
-		ExitCode   *int    `json:"exit_code"`
-		StartedAt  string  `json:"started_at"`
-		FinishedAt *string `json:"finished_at"`
-	}
-
-	var result []runRow
-	for rows.Next() {
-		var r runRow
-		if err := rows.Scan(&r.ID, &r.ScriptID, &r.Status, &r.ExitCode, &r.StartedAt, &r.FinishedAt); err != nil {
-			jsonError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		result = append(result, r)
-	}
-	if result == nil {
-		result = []runRow{}
-	}
-	jsonResponse(w, http.StatusOK, result)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{"run_id": runID})
 }
 
 func handleStopRun(w http.ResponseWriter, r *http.Request) {
@@ -763,6 +753,9 @@ func startPipRun(command string, args []string) (int64, error) {
 				db.Exec(`UPDATE runs SET status=?, exit_code=?, finished_at=CURRENT_TIMESTAMP, output=? WHERE id=?`,
 					status, exitCode, output, runID)
 				log.Printf("pip run %d finished: status=%s exit_code=%d", runID, status, exitCode)
+				if status == "success" {
+					pipFreezeToFile()
+				}
 				return
 			}
 		}
@@ -816,6 +809,150 @@ func handlePipUninstall(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal WebSocket handler
+// ---------------------------------------------------------------------------
+
+func handleTerminalWS(ws *websocket.Conn) {
+	// Manual auth check (websocket bypasses normal middleware)
+	if cfg.User != "" || cfg.Pass != "" {
+		cookie, err := ws.Request().Cookie("pyrunner_session")
+		if err != nil || !validSession(cookie.Value) {
+			ws.Write([]byte("\r\nUnauthorized\r\n"))
+			ws.Close()
+			return
+		}
+	}
+
+	// Kill previous terminal session if any
+	termMu.Lock()
+	if termProc != nil {
+		termProc.Kill()
+		termProc.Wait()
+		termProc = nil
+	}
+	termMu.Unlock()
+
+	// Start bash with a PTY
+	cmd := exec.Command("/bin/bash")
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		ws.Write([]byte(fmt.Sprintf("\r\nFailed to start shell: %v\r\n", err)))
+		ws.Close()
+		return
+	}
+
+	termMu.Lock()
+	termProc = cmd.Process
+	termMu.Unlock()
+
+	log.Printf("terminal session started (pid %d)", cmd.Process.Pid)
+
+	defer func() {
+		ptmx.Close()
+		cmd.Process.Kill()
+		cmd.Wait()
+		termMu.Lock()
+		if termProc != nil && termProc.Pid == cmd.Process.Pid {
+			termProc = nil
+		}
+		termMu.Unlock()
+		log.Printf("terminal session ended (pid %d)", cmd.Process.Pid)
+	}()
+
+	// PTY stdout -> websocket
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := ptmx.Read(buf)
+			if err != nil {
+				break
+			}
+			if _, err := ws.Write(buf[:n]); err != nil {
+				break
+			}
+		}
+		ws.Close()
+	}()
+
+	// Websocket -> PTY stdin
+	buf := make([]byte, 4096)
+	for {
+		n, err := ws.Read(buf)
+		if err != nil {
+			break
+		}
+		if _, err := ptmx.Write(buf[:n]); err != nil {
+			break
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PATCH content handler
+// ---------------------------------------------------------------------------
+
+func handlePatchContent(w http.ResponseWriter, r *http.Request) {
+	id := path.Base(r.PathValue("id"))
+
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	var filename string
+	err := db.QueryRow(`SELECT filename FROM scripts WHERE id = ?`, id).Scan(&filename)
+	if err == sql.ErrNoRows {
+		jsonError(w, http.StatusNotFound, "Script not found")
+		return
+	} else if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if err := os.WriteFile(scriptPath(filename), []byte(body.Content), 0644); err != nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("write file: %v", err))
+		return
+	}
+
+	db.Exec(`UPDATE scripts SET updated_at=CURRENT_TIMESTAMP WHERE id=?`, id)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+
+// ---------------------------------------------------------------------------
+// Pip persistence helpers
+// ---------------------------------------------------------------------------
+
+func pipFreezeToFile() {
+	out, err := exec.Command("pip3", "freeze", "--break-system-packages").Output()
+	if err != nil {
+		log.Printf("pip freeze failed: %v", err)
+		return
+	}
+	reqFile := filepath.Join(cfg.Data, "requirements.txt")
+	if err := os.WriteFile(reqFile, out, 0644); err != nil {
+		log.Printf("write requirements.txt failed: %v", err)
+	}
+}
+
+func pipRestoreFromFile() {
+	reqFile := filepath.Join(cfg.Data, "requirements.txt")
+	if _, err := os.Stat(reqFile); err != nil {
+		return // no file, skip
+	}
+	log.Printf("restoring pip packages from %s", reqFile)
+	cmd := exec.Command("pip3", "install", "--break-system-packages", "-r", reqFile)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Printf("pip restore failed: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -836,6 +973,9 @@ func main() {
 		log.Fatalf("init db: %v", err)
 	}
 	defer db.Close()
+
+	// Restore pip packages from requirements.txt if present
+	pipRestoreFromFile()
 
 	mux := http.NewServeMux()
 
@@ -859,11 +999,12 @@ func main() {
 	mux.HandleFunc("POST /api/scripts", handleCreateScript)
 	mux.HandleFunc("GET /api/scripts/{id}", handleGetScript)
 	mux.HandleFunc("PUT /api/scripts/{id}", handleUpdateScript)
+	mux.HandleFunc("PATCH /api/scripts/{id}/content", handlePatchContent)
 	mux.HandleFunc("DELETE /api/scripts/{id}", handleDeleteScript)
 	mux.HandleFunc("POST /api/scripts/{id}/run", handleRunScript)
-	mux.HandleFunc("GET /api/scripts/{id}/runs", handleListRuns)
 
 	// Run endpoints
+	mux.HandleFunc("GET /api/scripts/{id}/latest-run", handleLatestRun)
 	mux.HandleFunc("POST /api/runs/{id}/stop", handleStopRun)
 	mux.HandleFunc("GET /api/runs/{id}", handleGetRun)
 	mux.HandleFunc("GET /api/runs/{id}/stream", handleStreamRun)
@@ -872,6 +1013,9 @@ func main() {
 	mux.HandleFunc("GET /api/pip/list", handlePipList)
 	mux.HandleFunc("POST /api/pip/install", handlePipInstall)
 	mux.HandleFunc("POST /api/pip/uninstall", handlePipUninstall)
+
+	// Terminal WebSocket (auth handled inside handler)
+	mux.Handle("GET /api/terminal", websocket.Handler(handleTerminalWS))
 
 	handler := authMiddleware(mux)
 

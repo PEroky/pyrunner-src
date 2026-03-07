@@ -6,8 +6,8 @@
 <title>PyRunner</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+head,head *,style{display:none!important}
 
-/* Dark theme (default) */
 :root,html[data-theme="dark"]{
   --bg:#0f1117;--surface:#1a1b26;--surface2:#24253a;--border:#2f3146;
   --text:#c0caf5;--text2:#565f89;--accent:#7aa2f7;--green:#9ece6a;
@@ -18,7 +18,6 @@
   --badge-stop-bg:rgba(224,175,104,.15)
 }
 
-/* Light theme */
 html[data-theme="light"]{
   --bg:#f5f5f5;--surface:#fff;--surface2:#e8e8e8;--border:#d0d0d0;
   --text:#24292e;--text2:#6a737d;--accent:#0366d6;--green:#22863a;
@@ -68,27 +67,19 @@ html[data-theme="dark"] .btn-primary{color:#1a1b26}
 
 .tab-content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:10px 16px}
 
-/* Editor - fill all available space */
 .editor-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
 .editor-wrap textarea{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--font);font-size:13px;line-height:1.6;resize:none;outline:none;min-height:0}
 .editor-wrap textarea:focus{border-color:var(--accent)}
-.editor-bar{padding:8px 0 0;display:flex;justify-content:flex-end;flex-shrink:0}
+.editor-bar{padding:8px 0 0;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.save-indicator{font-size:11px;color:var(--text2);transition:opacity .3s}
 
-/* Terminal - fill all available space */
 .output-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
 .output-bar{margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .terminal{background:var(--terminal-bg);color:var(--terminal-fg);font-family:var(--font);font-size:13px;line-height:1.5;padding:10px;border-radius:6px;flex:1;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:0}
 
-.run-list{display:flex;flex-direction:column;gap:4px}
-.run-item{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--surface);border-radius:6px;cursor:pointer;transition:all .12s}
-.run-item:hover{background:var(--surface2)}
-.run-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
-.run-badge.running{background:var(--badge-run-bg);color:var(--accent)}
-.run-badge.success{background:var(--badge-ok-bg);color:var(--green)}
-.run-badge.failed,.run-badge.error{background:var(--badge-err-bg);color:var(--red)}
-.run-badge.stopped{background:var(--badge-stop-bg);color:var(--yellow)}
-.run-time{font-size:11px;color:var(--text2)}
-.run-id{font-size:11px;color:var(--text2);font-family:var(--font)}
+/* xterm terminal container */
+.xterm-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+.xterm-wrap .xterm{flex:1}
 
 .modal-overlay{position:fixed;inset:0;background:var(--modal-overlay);display:flex;align-items:center;justify-content:center;z-index:100}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:400px;max-width:90vw}
@@ -105,7 +96,6 @@ html[data-theme="dark"] .btn-primary{color:#1a1b26}
 
 .sidebar-footer{padding:8px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
 
-/* Pip */
 .pip-bar{display:flex;gap:8px;margin-bottom:12px;flex-shrink:0}
 .pip-bar input{flex:1;padding:7px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
 .pip-bar input:focus{border-color:var(--accent)}
@@ -115,7 +105,6 @@ html[data-theme="dark"] .btn-primary{color:#1a1b26}
 .pkg-table tr:hover td{background:var(--surface)}
 .pkg-count{font-size:11px;color:var(--text2)}
 
-/* Login */
 .login-wrap{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
 .login-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:340px;max-width:90vw}
 .login-box h1{font-size:18px;text-align:center;margin-bottom:20px;color:var(--accent)}
@@ -127,13 +116,13 @@ html[data-theme="dark"] .login-box .login-btn{color:#1a1b26}
 .login-box .login-btn:hover{opacity:.85}
 .login-error{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
 
-/* Theme toggle */
 .theme-toggle{background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1}
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+script{display:none!important}
 </style>
 </head>
 <body>
@@ -159,6 +148,7 @@ html[data-theme="dark"] .login-box .login-btn{color:#1a1b26}
     <div class="script-list" id="scriptList"></div>
     <div class="sidebar-footer">
       <button class="btn btn-sm" style="width:100%" onclick="showPipManager()">📦 包管理</button>
+      <button class="btn btn-sm" style="width:100%" onclick="showTerminal()">🖥️ 终端</button>
       <button class="btn btn-sm" id="logoutBtn" style="width:100%;display:none" onclick="doLogout()">🚪 退出</button>
     </div>
   </div>
@@ -182,9 +172,13 @@ html[data-theme="dark"] .login-box .login-btn{color:#1a1b26}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
 <script>
 const API='/api', MAX_TERM_LINES=50;
-let scripts=[],activeScript=null,activeTab='editor',currentRuns=[],streamSource=null,viewingRunId=null,authEnabled=false;
+let scripts=[],activeScript=null,activeTab='editor',streamSource=null,viewingRunId=null,authEnabled=false;
+let autoSaveTimer=null, lastSavedContent=null;
+let xtermObj=null, xtermWS=null, fitAddon=null;
 
 // --- Theme ---
 function initTheme(){
@@ -227,31 +221,28 @@ function renderScriptList(){
 
 async function selectScript(id){
   if(streamSource){streamSource.close();streamSource=null;}
+  cleanupXterm();
   activeScript=await api(`/scripts/${id}`);
+  lastSavedContent=activeScript.content||'';
   activeTab='editor';viewingRunId=null;
-  renderScriptList();renderMain();loadRuns();
-}
-
-async function loadRuns(){
-  if(!activeScript)return;
-  currentRuns=await api(`/scripts/${activeScript.id}/runs`);
-  if(activeTab==='history')renderTab();
+  renderScriptList();renderMain();
 }
 
 function renderMain(){
   if(!activeScript)return;
+  const isRunning=scripts.find(s=>s.id===activeScript.id)?.last_status==='running';
   const a=document.getElementById('mainArea');
   a.innerHTML=`
     <div class="main-header">
       <div class="title">${esc(activeScript.name)}.py</div>
       <button class="btn btn-sm" onclick="showEditModal()">✏️ 编辑</button>
       <button class="btn btn-sm btn-primary" onclick="runScript()">▶ 运行</button>
+      ${isRunning?'<button class="btn btn-sm btn-danger" onclick="stopCurrentRun()">⏹ 停止</button>':''}
       <button class="btn btn-sm btn-danger" onclick="deleteScript()">删除</button>
     </div>
     <div class="tabs">
       <div class="tab ${activeTab==='editor'?'active':''}" onclick="swTab('editor')">代码</div>
       <div class="tab ${activeTab==='output'?'active':''}" onclick="swTab('output')">输出</div>
-      <div class="tab ${activeTab==='history'?'active':''}" onclick="swTab('history')">历史</div>
     </div>
     <div class="tab-content" id="tabContent"></div>`;
   renderTab();
@@ -263,41 +254,80 @@ function renderTab(){
   const tc=document.getElementById('tabContent');
   if(!tc)return;
   if(activeTab==='editor'){
-    tc.innerHTML=`<div class="editor-wrap"><textarea id="codeEditor" spellcheck="false">${esc(activeScript.content||'')}</textarea><div class="editor-bar"><button class="btn btn-primary" onclick="saveCode()">💾 保存</button></div></div>`;
+    tc.innerHTML=`<div class="editor-wrap"><textarea id="codeEditor" spellcheck="false">${esc(activeScript.content||'')}</textarea><div class="editor-bar"><span class="save-indicator" id="saveIndicator"></span><button class="btn btn-primary" onclick="saveCode()">💾 保存</button></div></div>`;
     const ed=document.getElementById('codeEditor');
-    ed.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();const s=ed.selectionStart;ed.value=ed.value.substring(0,s)+'    '+ed.value.substring(ed.selectionEnd);ed.selectionStart=ed.selectionEnd=s+4;}});
+    ed.addEventListener('keydown',e=>{
+      if(e.key==='Tab'){e.preventDefault();const s=ed.selectionStart;ed.value=ed.value.substring(0,s)+'    '+ed.value.substring(ed.selectionEnd);ed.selectionStart=ed.selectionEnd=s+4;}
+      if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveCode();}
+    });
+    ed.addEventListener('input',()=>scheduleAutoSave());
   }else if(activeTab==='output'){
-    tc.innerHTML=`<div class="output-wrap"><div class="output-bar"><span id="outputStatus" style="font-size:12px;color:var(--text2)">无输出</span><span style="flex:1"></span><button class="btn btn-sm btn-danger" id="stopBtn" style="display:none" onclick="stopRun()">⏹ 停止</button></div><div class="terminal" id="terminal"></div></div>`;
-    if(viewingRunId)restoreStream(viewingRunId);
-  }else{
-    if(!currentRuns.length){tc.innerHTML='<div style="color:var(--text2);text-align:center;padding:30px;font-size:13px">暂无记录</div>';return;}
-    tc.innerHTML=`<div class="run-list">${currentRuns.map(r=>`
-      <div class="run-item" onclick="viewRun(${r.id})">
-        <span class="run-id">#${r.id}</span>
-        <span class="run-badge ${r.status}">${stxt(r.status)}</span>
-        <span class="run-time">${ftime(r.started_at)}</span>
-        ${r.finished_at?`<span class="run-time">→ ${ftime(r.finished_at)}</span>`:''}
-      </div>`).join('')}</div>`;
+    tc.innerHTML=`<div class="output-wrap"><div class="output-bar"><span id="outputStatus" style="font-size:12px;color:var(--text2)">无输出</span><span style="flex:1"></span><button class="btn btn-sm btn-danger" id="stopBtn" style="display:none" onclick="stopCurrentRun()">⏹ 停止</button></div><div class="terminal" id="terminal"></div></div>`;
+    loadLatestOutput();
   }
 }
 
+// --- Auto Save ---
+function scheduleAutoSave(){
+  const ind=document.getElementById('saveIndicator');
+  if(ind){ind.textContent='未保存';ind.style.color='var(--yellow)';}
+  if(autoSaveTimer)clearTimeout(autoSaveTimer);
+  autoSaveTimer=setTimeout(()=>doAutoSave(),1500);
+}
+
+async function doAutoSave(){
+  if(!activeScript)return;
+  const ed=document.getElementById('codeEditor');
+  if(!ed)return;
+  const content=ed.value;
+  if(content===lastSavedContent)return;
+  try{
+    await api(`/scripts/${activeScript.id}/content`,{method:'PATCH',body:{content}});
+    lastSavedContent=content;
+    activeScript.content=content;
+    const ind=document.getElementById('saveIndicator');
+    if(ind){ind.textContent='已自动保存';ind.style.color='var(--green)';setTimeout(()=>{if(ind.textContent==='已自动保存')ind.textContent='';},2000);}
+  }catch(e){console.error('auto-save failed',e);}
+}
+
 function stxt(s){return{running:'运行中',success:'成功',failed:'失败',error:'失败',stopped:'已停止'}[s]||s;}
-function ftime(t){return t?(t.replace('T',' ').substring(0,19)):''}
 
 async function saveCode(){
+  if(autoSaveTimer){clearTimeout(autoSaveTimer);autoSaveTimer=null;}
   const c=document.getElementById('codeEditor').value;
   await api(`/scripts/${activeScript.id}`,{method:'PUT',body:{name:activeScript.name,description:activeScript.description,content:c}});
-  activeScript.content=c;showToast('已保存');
+  activeScript.content=c;lastSavedContent=c;
+  const ind=document.getElementById('saveIndicator');
+  if(ind){ind.textContent='已保存';ind.style.color='var(--green)';setTimeout(()=>{if(ind.textContent==='已保存')ind.textContent='';},2000);}
+  showToast('已保存');
 }
 
+// --- Run / Output ---
 async function runScript(){
+  // Auto-save before running
+  const ed=document.getElementById('codeEditor');
+  if(ed&&ed.value!==lastSavedContent){
+    await api(`/scripts/${activeScript.id}/content`,{method:'PATCH',body:{content:ed.value}});
+    activeScript.content=ed.value;lastSavedContent=ed.value;
+  }
   const res=await api(`/scripts/${activeScript.id}/run`,{method:'POST'});
   if(res.error){alert(res.error);return;}
-  viewingRunId=res.run_id;activeTab='output';renderMain();
-  startStream(res.run_id);loadRuns();loadScripts();
+  viewingRunId=res.run_id;
+  activeTab='output';
+  renderMain();
+  startStream(res.run_id);
+  loadScripts();
 }
 
-// --- Terminal line limiter ---
+async function loadLatestOutput(){
+  if(!activeScript)return;
+  if(viewingRunId){restoreStream(viewingRunId);return;}
+  try{
+    const res=await api(`/scripts/${activeScript.id}/latest-run`);
+    if(res.run_id){viewingRunId=res.run_id;restoreStream(res.run_id);}
+  }catch(e){}
+}
+
 function appendTerm(term,text){
   term.textContent+=text;
   const lines=term.textContent.split('\n');
@@ -307,7 +337,6 @@ function appendTerm(term,text){
   term.scrollTop=term.scrollHeight;
 }
 
-// --- SSE Stream ---
 function startStream(runId){
   if(streamSource){streamSource.close();}
   const term=document.getElementById('terminal');
@@ -327,7 +356,7 @@ function startStream(runId){
     try{const d=JSON.parse(e.data);status=d.status;}catch(_){status=e.data;}
     if(st)st.innerHTML=`<span class="run-badge ${status}">${stxt(status)}</span> #${runId}`;
     if(sb)sb.style.display='none';
-    streamSource.close();streamSource=null;loadRuns();loadScripts();
+    streamSource.close();streamSource=null;loadScripts();
   });
   streamSource.onerror=()=>{if(streamSource){streamSource.close();streamSource=null;}if(sb)sb.style.display='none';};
 }
@@ -338,14 +367,12 @@ async function restoreStream(runId){
   const st=document.getElementById('outputStatus');
   const sb=document.getElementById('stopBtn');
   if(!term)return;
-  // Show only last 50 lines of existing output
   const lines=(run.output||'').split('\n');
   term.textContent=lines.slice(-MAX_TERM_LINES).join('\n');
   term.scrollTop=term.scrollHeight;
   if(run.status==='running'){
     if(st)st.innerHTML=`<span class="run-badge running">运行中</span> #${runId}`;
     if(sb)sb.style.display='';
-    // Continue streaming from where we are
     streamSource=new EventSource(`/api/runs/${runId}/stream`);
     streamSource.addEventListener('output',e=>{
       try{const txt=JSON.parse(e.data);appendTerm(term,txt);}catch(_){appendTerm(term,e.data+'\n');}
@@ -353,7 +380,7 @@ async function restoreStream(runId){
     streamSource.addEventListener('done',e=>{
       let status;try{const d=JSON.parse(e.data);status=d.status;}catch(_){status=e.data;}
       if(st)st.innerHTML=`<span class="run-badge ${status}">${stxt(status)}</span> #${runId}`;
-      if(sb)sb.style.display='none';streamSource.close();streamSource=null;loadRuns();loadScripts();
+      if(sb)sb.style.display='none';streamSource.close();streamSource=null;loadScripts();
     });
     streamSource.onerror=()=>{if(streamSource){streamSource.close();streamSource=null;}if(sb)sb.style.display='none';};
   }else{
@@ -362,8 +389,14 @@ async function restoreStream(runId){
   }
 }
 
-async function viewRun(id){viewingRunId=id;activeTab='output';renderMain();}
-async function stopRun(){if(!viewingRunId)return;await api(`/runs/${viewingRunId}/stop`,{method:'POST'});}
+async function stopCurrentRun(){
+  if(!viewingRunId){
+    // Find running run from script list
+    const s=scripts.find(x=>activeScript&&x.id===activeScript.id);
+    if(!s)return;
+  }
+  if(viewingRunId) await api(`/runs/${viewingRunId}/stop`,{method:'POST'});
+}
 
 async function deleteScript(){
   if(!confirm(`确认删除 ${activeScript.name}？`))return;
@@ -392,11 +425,106 @@ async function submitModal(){
   }
 }
 
+// --- Web Terminal (xterm.js) ---
+function cleanupXterm(){
+  if(xtermWS){try{xtermWS.close();}catch(e){}xtermWS=null;}
+  if(xtermObj){xtermObj.dispose();xtermObj=null;}
+  fitAddon=null;
+}
+
+function showTerminal(){
+  activeScript=null;if(streamSource){streamSource.close();streamSource=null;}
+  renderScriptList();
+  const a=document.getElementById('mainArea');
+  a.innerHTML=`
+    <div class="main-header">
+      <div class="title">🖥️ 终端</div>
+      <button class="btn btn-sm" onclick="reconnectTerminal()">↻ 重连</button>
+    </div>
+    <div style="flex:1;padding:10px 16px;display:flex;flex-direction:column;min-height:0">
+      <div id="xtermContainer" class="xterm-wrap"></div>
+    </div>`;
+  initXterm();
+}
+
+function initXterm(){
+  cleanupXterm();
+  // Ensure xterm CSS is loaded
+  if(!document.getElementById('xterm-css')){
+    const link=document.createElement('link');
+    link.id='xterm-css';link.rel='stylesheet';
+    link.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css';
+    document.head.appendChild(link);
+  }
+  const container=document.getElementById('xtermContainer');
+  if(!container)return;
+
+  xtermObj=new Terminal({
+    cursorBlink:true,
+    fontSize:13,
+    fontFamily:"'SF Mono',SFMono-Regular,ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace",
+    theme:{
+      background:'#000',
+      foreground:'#d4d4d4',
+      cursor:'#d4d4d4'
+    },
+    allowProposedApi:true
+  });
+  fitAddon=new FitAddon.FitAddon();
+  xtermObj.loadAddon(fitAddon);
+  xtermObj.open(container);
+  setTimeout(()=>fitAddon.fit(),50);
+
+  // WebSocket
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  xtermWS=new WebSocket(`${proto}//${location.host}/api/terminal`);
+  xtermWS.binaryType='arraybuffer';
+
+  xtermWS.onopen=()=>{
+    // Send initial size
+    const cols=xtermObj.cols,rows=xtermObj.rows;
+    xtermObj.focus();
+  };
+
+  xtermWS.onmessage=(ev)=>{
+    if(ev.data instanceof ArrayBuffer){
+      xtermObj.write(new Uint8Array(ev.data));
+    }else{
+      xtermObj.write(ev.data);
+    }
+  };
+
+  xtermWS.onclose=()=>{
+    xtermObj.write('\r\n\x1b[31m[连接已断开]\x1b[0m\r\n');
+  };
+
+  xtermWS.onerror=()=>{
+    xtermObj.write('\r\n\x1b[31m[连接错误]\x1b[0m\r\n');
+  };
+
+  xtermObj.onData((data)=>{
+    if(xtermWS&&xtermWS.readyState===WebSocket.OPEN){
+      xtermWS.send(data);
+    }
+  });
+
+  // Handle resize
+  const resizeObs=new ResizeObserver(()=>{
+    if(fitAddon)try{fitAddon.fit();}catch(e){}
+  });
+  resizeObs.observe(container);
+}
+
+function reconnectTerminal(){
+  initXterm();
+}
+
 // --- Pip ---
 let pipPackages=[],pipFilter='',pipRunId=null,pipStream=null;
 
 async function showPipManager(){
   activeScript=null;if(streamSource){streamSource.close();streamSource=null;}
+  cleanupXterm();
   renderScriptList();
   document.getElementById('mainArea').innerHTML=`
     <div class="main-header"><div class="title">📦 pip 包管理</div></div>

@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/creack/pty"
@@ -84,6 +85,15 @@ var (
 type procEntry struct {
 	cancel context.CancelFunc
 	cmd    *exec.Cmd
+}
+
+// killGroup kills the entire process group (the process and all its children).
+func (p *procEntry) killGroup() {
+	if p.cmd.Process != nil {
+		// Kill the entire process group: negative PID = process group
+		syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL)
+	}
+	p.cancel()
 }
 
 type syncWriter struct {
@@ -501,7 +511,7 @@ func handleRunScript(w http.ResponseWriter, r *http.Request) {
 			rows.Scan(&prevID)
 			prevIDStr := fmt.Sprintf("%d", prevID)
 			if v, ok := runningProcs.Load(prevIDStr); ok {
-				v.(*procEntry).cancel()
+				v.(*procEntry).killGroup()
 				log.Printf("auto-stopped previous run %d for script %d", prevID, scriptID)
 			}
 		}
@@ -517,7 +527,8 @@ func handleRunScript(w http.ResponseWriter, r *http.Request) {
 	runIDStr := fmt.Sprintf("%d", runID)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "python3", scriptPath(filename))
+	cmd := exec.CommandContext(ctx, "python3", "-u", scriptPath(filename))
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	sw := &syncWriter{}
 	cmd.Stdout = sw
@@ -599,8 +610,8 @@ func handleStopRun(w http.ResponseWriter, r *http.Request) {
 
 	if v, ok := runningProcs.Load(id); ok {
 		entry := v.(*procEntry)
-		entry.cancel()
-		log.Printf("stopped run %s", id)
+		entry.killGroup()
+		log.Printf("stopped run %s (killed process group)", id)
 		jsonResponse(w, http.StatusOK, map[string]interface{}{"ok": true})
 		return
 	}
@@ -705,6 +716,7 @@ func startPipRun(command string, args []string) (int64, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	sw := &syncWriter{}
 	cmd.Stdout = sw
